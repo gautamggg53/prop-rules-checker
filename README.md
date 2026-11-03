@@ -30,7 +30,7 @@ nearly broke) which rule, and what it had to assume to decide.
 Not on PyPI yet. Install from source:
 
 ```bash
-git clone https://github.com/<owner>/prop-rules-checker
+git clone https://github.com/gautamggg53/prop-rules-checker
 cd prop-rules-checker
 pip install .
 ```

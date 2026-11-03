@@ -61,3 +61,8 @@ src = ["src", "tests"]
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
 ignore = ["RUF001", "RUF002", "RUF003"]
+
+[project.urls]
+Homepage = "https://github.com/gautamggg53/prop-rules-checker"
+Issues = "https://github.com/gautamggg53/prop-rules-checker/issues"
+Changelog = "https://github.com/gautamggg53/prop-rules-checker/blob/main/CHANGELOG.md"
