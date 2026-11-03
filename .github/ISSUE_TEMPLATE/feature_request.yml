@@ -1,0 +1,22 @@
+name: Feature request / new rule
+description: Suggest a new rule type, option or output.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: For a rule, quote how firms typically word it (without naming a firm is fine).
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behaviour
+      description: How should it be configured in the rule set, and what should the report say?
+      render: yaml
+  - type: textarea
+    id: edge-cases
+    attributes:
+      label: Edge cases
+      description: Day boundaries, timezones, partial closes, what counts as a breach vs a near-miss...

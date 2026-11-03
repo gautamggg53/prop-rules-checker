@@ -1,0 +1,38 @@
+name: New platform / export format
+description: Ask for support for a platform export we don't read yet (or a variant we read wrongly).
+labels: [format]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Real exports are the best way to get a parser right. Please **anonymise** them first:
+        replace account numbers, names, tickets and amounts. Layout matters more than values.
+  - type: input
+    id: platform
+    attributes:
+      label: Platform and version
+      placeholder: e.g. Match-Trader web, MT5 build 4xxx, cTrader desktop 5.x
+    validations:
+      required: true
+  - type: textarea
+    id: how
+    attributes:
+      label: How you exported the file
+      description: Menu path and options chosen (HTML/CSV, language, columns shown).
+    validations:
+      required: true
+  - type: textarea
+    id: header
+    attributes:
+      label: Header row and 2-3 anonymised data rows
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: timezone
+    attributes:
+      label: Timezone of the timestamps (if known)
+  - type: textarea
+    id: docs
+    attributes:
+      label: Links to official documentation of the format (if any)

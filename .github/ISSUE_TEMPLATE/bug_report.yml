@@ -1,0 +1,41 @@
+name: Bug report
+description: The checker crashed, mis-parsed a file, or flagged something wrongly.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please **remove account numbers, names and anything private** before attaching files.
+        A few anonymised rows that reproduce the problem are ideal.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `prop-rules-check --version`
+    validations:
+      required: true
+  - type: input
+    id: command
+    attributes:
+      label: Command you ran
+      placeholder: prop-rules-check history.htm --rules my-rules.yaml --source-tz Europe/Athens
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened, and what did you expect?
+      description: Include the output (or the relevant part of `--json`).
+    validations:
+      required: true
+  - type: textarea
+    id: rules
+    attributes:
+      label: Rule set (YAML/JSON), if relevant
+      render: yaml
+  - type: textarea
+    id: sample
+    attributes:
+      label: Anonymised sample rows
+      description: Header row plus a few rows of the export that trigger the issue.
+      render: text
