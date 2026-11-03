@@ -1,0 +1,5 @@
+# SYNTHETIC example news calendar (made-up events). Times are UTC.
+time,currency,impact,title
+2026-04-14T13:31:00Z,USD,high,Example US CPI release
+2026-04-15T08:00:00Z,EUR,medium,Example EU PMI
+2026-04-16T14:00:00Z,USD,high,Example Fed speech
