@@ -1,0 +1,5 @@
+Trade #,Type,Signal,Date/Time,Price,Contracts,Profit,Profit %,Cum. Profit,Cum. Profit %,Run-up,Run-up %,Drawdown,Drawdown %
+1,Entry Long,Long,2026-03-02 10:00,21000.25,2,,,,,,,,
+1,Exit Long,TP,2026-03-02 10:40,21040.25,2,160.00,0.38,160.00,0.16,200.00,0.48,30.00,0.07
+2,Entry Short,Short,2026-03-03 14:30,21100.00,2,,,,,,,,
+2,Exit Short,SL,2026-03-03 15:10,21120.00,2,-80.00,-0.19,80.00,0.08,10.00,0.02,95.00,0.23

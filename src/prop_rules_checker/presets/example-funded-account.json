@@ -1,0 +1,15 @@
+{
+  "name": "Example funded account (illustrative JSON preset, not a real firm)",
+  "description": "ILLUSTRATIVE EXAMPLE ONLY. Made-up funded-stage rules showing the JSON form. NOT the current rules of any real prop firm.",
+  "account": {"initial_balance": 25000, "currency": "USD"},
+  "day_reset": {"timezone": "UTC", "time": "00:00"},
+  "warn_at": 0.8,
+  "rules": {
+    "daily_loss": {"limit_amount": 1000, "reference": "initial_balance", "measure": "balance"},
+    "max_drawdown": {"limit_amount": 2000, "measure": "balance"},
+    "consistency": {"max_best_day_pct": 30, "denominator": "positive_days"},
+    "news_trading": {"minutes_before": 5, "minutes_after": 5, "impacts": ["high"], "hold_through": "allow"},
+    "weekend_holding": {"allowed": false, "timezone": "UTC", "friday_close": "21:00", "sunday_open": "21:00"},
+    "lot_size": {"max_open_lots": 5}
+  }
+}

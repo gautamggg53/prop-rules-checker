@@ -1,0 +1,5 @@
+# SYNTHETIC news events for tests (made-up times).
+time,currency,impact,title
+2026-03-05 13:30,USD,high,US CPI (synthetic)
+2026-03-04 10:00,EUR,low,EU sentiment (synthetic)
+2026-03-10 13:30,USD,high,US retail sales (synthetic)

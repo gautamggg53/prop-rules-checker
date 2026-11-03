@@ -1,0 +1,37 @@
+# ILLUSTRATIVE EXAMPLE ONLY.
+# These numbers are a made-up example of a typical two-step evaluation (phase 1).
+# They are NOT the current rules of any real prop firm. Copy this file and edit it
+# to match the written rules of your own account before relying on the output.
+name: "Example 2-step challenge, phase 1 (illustrative, not a real firm)"
+description: >-
+  Static 10% max loss, 5% daily loss measured from the day's starting balance,
+  8% profit target, 4 minimum trading days, no trading 2 minutes around
+  high-impact news.
+account:
+  initial_balance: 100000
+  currency: USD
+day_reset:
+  timezone: Europe/Prague   # day rolls over at midnight in this zone
+  time: "00:00"
+warn_at: 0.8
+rules:
+  daily_loss:
+    limit_pct: 5
+    reference: initial_balance   # 5% of the initial balance...
+    measure: equity              # ...measured on equity (approximated from closed trades)
+  max_drawdown:
+    limit_pct: 10
+    measure: equity
+  profit_target:
+    target_pct: 8
+  min_trading_days:
+    days: 4
+    count_by: open
+  news_trading:
+    minutes_before: 2
+    minutes_after: 2
+    impacts: [high]
+    check: [open, close]
+    hold_through: warn
+  lot_size:
+    max_lots_per_trade: 20

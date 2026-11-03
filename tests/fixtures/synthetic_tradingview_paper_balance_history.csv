@@ -1,0 +1,4 @@
+Time,Balance Before,Balance After,Realized P&L (value),Realized P&L (currency),Action
+2026-03-02 15:40:00,100000.00,100420.00,420.00,USD,"Close long position for symbol FX:EURUSD at price 1.08920 for 100000 units. Position AVG Price was 1.08500, currency: USD, rate: 1.000, point value: 1.000000"
+2026-03-02 15:40:00,100420.00,100413.00,-7.00,USD,"Commission for: Close long position for symbol FX:EURUSD at price 1.08920 for 100000 units"
+2026-03-03 11:30:00,100413.00,99413.00,-1000.00,USD,"Close short position for symbol FX:GBPUSD at price 1.26900 for 200000 units. Position AVG Price was 1.26400, currency: USD, rate: 1.000, point value: 1.000000"

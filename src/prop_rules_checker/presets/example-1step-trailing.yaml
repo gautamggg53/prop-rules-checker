@@ -1,0 +1,42 @@
+# ILLUSTRATIVE EXAMPLE ONLY.
+# A made-up one-step evaluation with a trailing drawdown that locks at the
+# starting balance. NOT the current rules of any real prop firm. Edit it to match
+# the written rules of your own account.
+name: "Example 1-step trailing challenge (illustrative, not a real firm)"
+description: >-
+  6% trailing drawdown on closed balance that stops trailing once it reaches
+  the starting balance, 3% daily loss, 10% target, best day at most 40% of
+  total profit, no positions held over the weekend.
+account:
+  initial_balance: 50000
+  currency: USD
+day_reset:
+  timezone: America/New_York
+  time: "17:00"              # trading day rolls over at 5 pm New York time
+warn_at: 0.8
+rules:
+  daily_loss:
+    limit_pct: 3
+    reference: day_start_balance
+    measure: balance
+  trailing_drawdown:
+    limit_pct: 6
+    measure: balance
+    lock_at: initial_balance
+  profit_target:
+    target_pct: 10
+  consistency:
+    max_best_day_pct: 40
+    denominator: net_profit
+  min_trading_days:
+    days: 3
+  weekend_holding:
+    allowed: false
+    timezone: America/New_York
+    friday_close: "17:00"
+    sunday_open: "17:00"
+    warn_within_minutes: 15
+    exempt_symbols: [BTCUSD, ETHUSD]
+  lot_size:
+    max_lots_per_trade: 5
+    max_open_lots: 10

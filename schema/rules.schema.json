@@ -1,0 +1,303 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "prop-rules-checker rule set",
+  "type": "object",
+  "required": [
+    "name",
+    "account",
+    "rules"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string"
+    },
+    "account": {
+      "type": "object",
+      "required": [
+        "initial_balance"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "initial_balance": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "currency": {
+          "type": "string"
+        }
+      }
+    },
+    "day_reset": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "timezone": {
+          "type": "string",
+          "description": "IANA zone, e.g. Europe/Prague"
+        },
+        "time": {
+          "type": "string",
+          "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+        }
+      }
+    },
+    "warn_at": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 1
+    },
+    "rules": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "daily_loss": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "limit_pct": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 100,
+              "description": "Limit as a percentage (of the reference balance)."
+            },
+            "limit_amount": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Limit as an amount in account currency."
+            },
+            "reference": {
+              "type": "string",
+              "enum": [
+                "initial_balance",
+                "day_start_balance"
+              ]
+            },
+            "measure": {
+              "type": "string",
+              "enum": [
+                "balance",
+                "equity"
+              ],
+              "description": "equity is approximated from closed trades (see README)."
+            }
+          }
+        },
+        "max_drawdown": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "limit_pct": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 100,
+              "description": "Limit as a percentage (of the reference balance)."
+            },
+            "limit_amount": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Limit as an amount in account currency."
+            },
+            "measure": {
+              "type": "string",
+              "enum": [
+                "balance",
+                "equity"
+              ],
+              "description": "equity is approximated from closed trades (see README)."
+            }
+          }
+        },
+        "trailing_drawdown": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "limit_pct": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 100,
+              "description": "Limit as a percentage (of the reference balance)."
+            },
+            "limit_amount": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "Limit as an amount in account currency."
+            },
+            "measure": {
+              "type": "string",
+              "enum": [
+                "balance",
+                "equity"
+              ],
+              "description": "equity is approximated from closed trades (see README)."
+            },
+            "lock_at": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "initial_balance"
+                  ]
+                },
+                {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        "profit_target": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "target_pct": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "target_amount": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        "consistency": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "max_best_day_pct"
+          ],
+          "properties": {
+            "max_best_day_pct": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 100
+            },
+            "denominator": {
+              "type": "string",
+              "enum": [
+                "net_profit",
+                "positive_days"
+              ]
+            }
+          }
+        },
+        "min_trading_days": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "days"
+          ],
+          "properties": {
+            "days": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "count_by": {
+              "type": "string",
+              "enum": [
+                "open",
+                "close",
+                "any"
+              ]
+            }
+          }
+        },
+        "news_trading": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "minutes_before": {
+              "type": "number",
+              "minimum": 0
+            },
+            "minutes_after": {
+              "type": "number",
+              "minimum": 0
+            },
+            "impacts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "check": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "enum": [
+                  "open",
+                  "close"
+                ]
+              }
+            },
+            "hold_through": {
+              "type": "string",
+              "enum": [
+                "forbid",
+                "warn",
+                "allow"
+              ]
+            },
+            "warn_buffer_minutes": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        },
+        "weekend_holding": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "allowed": {
+              "type": "boolean"
+            },
+            "timezone": {
+              "type": "string"
+            },
+            "friday_close": {
+              "type": "string",
+              "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+            },
+            "sunday_open": {
+              "type": "string",
+              "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+            },
+            "warn_within_minutes": {
+              "type": "number",
+              "minimum": 0
+            },
+            "exempt_symbols": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "lot_size": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "max_lots_per_trade": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "max_open_lots": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        }
+      }
+    }
+  }
+}
