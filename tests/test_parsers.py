@@ -264,6 +264,36 @@ def test_load_errors(tmp_path, fixtures):
     assert any("--symbol" in n for n in h.notes)
 
 
+def test_csv_excel_sep_directive_is_honoured_and_dropped(tmp_path):
+    from prop_rules_checker.parsers.common import read_csv_rows
+
+    rows, delim = read_csv_rows("sep=;\nclose_time;pnl;symbol\n2024-01-02 10:00;-12,5;EURUSD\n")
+    assert delim == ";"
+    assert rows == [
+        ["close_time", "pnl", "symbol"],
+        ["2024-01-02 10:00", "-12,5", "EURUSD"],
+    ]
+    # Quoted, upper-case and tab variants seen in the wild.
+    assert read_csv_rows('"SEP=,"\na,b\n')[0] == [["a", "b"]]
+    assert read_csv_rows("sep=\t\na\tb\n") == ([["a", "b"]], "\t")
+    # sep= before a comment line, then a real header.
+    rows, delim = read_csv_rows("sep=;\n# broker export\nclose_time;pnl\n2024-01-02 10:00;1,5\n")
+    assert delim == ";" and rows[0] == ["close_time", "pnl"]
+    p = tmp_path / "sep.csv"
+    p.write_text("sep=;\nclose_time;pnl\n2026-03-02 10:00;1,500\n")
+    assert load_trades(p).trades[0].pnl == 1.5
+
+
+def test_csv_delimiter_inside_quoted_header_is_ignored():
+    from prop_rules_checker.parsers.common import read_csv_rows
+
+    # Two commas inside quotes but only one real delimiter (;).
+    text = '"Profit, USD";"Close time, UTC"\n"1,5";2024-01-02\n'
+    rows, delim = read_csv_rows(text)
+    assert delim == ";"
+    assert rows == [["Profit, USD", "Close time, UTC"], ["1,5", "2024-01-02"]]
+
+
 def test_semicolon_csv_uses_decimal_comma(tmp_path):
     p = tmp_path / "s.csv"
     p.write_text("close_time;pnl\n2026-03-02 10:00;1,500\n")

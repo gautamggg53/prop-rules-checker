@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- CSV files that start with Excel's `sep=;` line (common in semicolon-delimited
+  exports from European locales) are now read with that delimiter, and the line
+  is no longer mistaken for the header.
+- Delimiter sniffing ignores commas inside quoted header cells, so a header like
+  `"Profit, USD";"Close time"` is split on `;` rather than `,`.
+
 ## [0.1.0] - 2026-11-03
 
 First public release.

@@ -155,19 +155,55 @@ def looks_like_html(text: str) -> bool:
     return "<html" in head or "<table" in text[:200000].lower()
 
 
+_SEP_DIRECTIVE = re.compile(r'^\s*"?sep=(.)"?\s*$', re.IGNORECASE)
+_DELIMITERS = (",", ";", "\t")
+
+
+def _count_delimiters_outside_quotes(line: str) -> dict[str, int]:
+    counts = dict.fromkeys(_DELIMITERS, 0)
+    quoted = False
+    for ch in line:
+        if ch == '"':
+            quoted = not quoted
+        elif not quoted and ch in counts:
+            counts[ch] += 1
+    return counts
+
+
 def read_csv_rows(text: str) -> tuple[list[list[str]], str]:
-    """Split CSV text into rows, sniffing the delimiter. Lines starting with '#' are comments."""
-    lines = [ln for ln in text.splitlines() if ln.strip() and not ln.lstrip().startswith("#")]
+    """Split CSV text into rows, sniffing the delimiter. Lines starting with '#' are comments.
+
+    An Excel ``sep=;`` directive on the first non-comment line is honoured and dropped.
+    Otherwise the delimiter is the one that appears most often on the first data line
+    outside double quotes, so commas inside quoted header cells are not counted.
+    """
+    raw_lines = text.splitlines()
+    # Drop a leading Excel sep= directive before comment filtering so it never becomes a header.
+    delimiter: str | None = None
+    if raw_lines:
+        first_nonempty = next((ln for ln in raw_lines if ln.strip()), "")
+        directive = _SEP_DIRECTIVE.match(first_nonempty)
+        if directive:
+            delimiter = directive.group(1)
+            # Remove the first occurrence of that physical line.
+            for i, ln in enumerate(raw_lines):
+                if ln.strip():
+                    del raw_lines[i]
+                    break
+
+    lines = [ln for ln in raw_lines if ln.strip() and not ln.lstrip().startswith("#")]
     if not lines:
         raise InputError("the file is empty")
-    sample = "\n".join(lines[:20])
-    counts = {d: lines[0].count(d) for d in (",", ";", "\t")}
-    delimiter = max(counts, key=lambda d: counts[d])
-    if counts[delimiter] == 0:
-        try:
-            delimiter = csv.Sniffer().sniff(sample, delimiters=",;\t").delimiter
-        except csv.Error:
-            delimiter = ","
+    if delimiter is None:
+        counts = _count_delimiters_outside_quotes(lines[0])
+        if any(counts.values()):
+            delimiter = max(counts, key=lambda d: counts[d])
+        else:
+            sample = "\n".join(lines[:20])
+            try:
+                delimiter = csv.Sniffer().sniff(sample, delimiters=",;\t").delimiter
+            except csv.Error:
+                delimiter = ","
     rows = list(csv.reader(io.StringIO("\n".join(lines)), delimiter=delimiter))
     rows = [[c.strip() for c in r] for r in rows if any(c.strip() for c in r)]
     return rows, delimiter
