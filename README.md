@@ -16,7 +16,7 @@ nearly broke) which rule, and what it had to assume to decide.
 - Reads **MT4, MT5, cTrader, TradingView** exports and a simple **generic CSV**, with auto-detection.
 - Rules live in editable **YAML/JSON** files validated against a JSON Schema.
 - **Near-miss warnings** at a configurable fraction of each limit (default 80%).
-- **States its assumptions** in every report (e.g. when equity limits can only be approximated).
+- **States its limits first.** Anything a PASS cannot prove (open positions, floating equity, ambiguous dates) is printed above the status table. The assumptions used to decide follow the findings.
 - CLI with text or JSON output and CI-friendly exit codes, plus a small Python API.
 - Python 3.10+, one runtime dependency (PyYAML). MIT licensed.
 
@@ -27,26 +27,41 @@ nearly broke) which rule, and what it had to assume to decide.
 
 ## Install
 
-Not on PyPI yet. Install from source:
+Not on PyPI yet. From a clone:
 
 ```bash
 git clone https://github.com/gautamggg53/prop-rules-checker
 cd prop-rules-checker
-pip install .
+python -m venv .venv
+. .venv/bin/activate
+python -m pip install .
 ```
 
+`python -m prop_rules_checker` runs the tool even when the `prop-rules-check` script is not on your PATH. Inside the virtualenv above, `prop-rules-check` is on the PATH as well.
+
 ## Quickstart
+
+The install includes a synthetic history. This works from any directory and does not need the `examples/` folder:
+
+```bash
+python -m prop_rules_checker --demo
+```
+
+That is the same check as:
 
 ```bash
 prop-rules-check examples/sample-trades.csv --rules example-1step-trailing
 ```
 
-Actual output (the sample file is synthetic):
+Actual output of the file command (the sample is synthetic; `--demo` prints one extra line saying so). Exit code `1` means at least one violation:
 
 ```text
 Rule set: Example 1-step trailing challenge (illustrative, not a real firm)
 Trades:   8 (generic, 2026-04-06 to 2026-04-16 UTC)
 Balance:  50,000.00 USD -> 51,800.00 USD (net +1,800.00)
+
+Closed-trade limits (a PASS does not prove these):
+  - Balance starts at 50,000.00 USD (from the rule set) and moves only with closed-trade P/L; deposits, withdrawals and positions still open at export time are not included.
 
 RULE                    STATUS   DETAIL
 Daily loss limit        WARN     worst day 2026-04-08: 1,500.00 USD of 1,584.00 USD (94.7%)
@@ -58,19 +73,46 @@ Weekend holding         FAIL     1 trade(s) held over a weekend
 Lot size                FAIL     largest trade 6 lots (max 5); peak open 7 lots (max 10)
 
 Findings:
-  [WARN] Daily loss limit: 2026-04-08: down 1,500.00 USD from the day's start balance of 52,800.00 USD; limit 1,584.00 USD (94.7% used)
-  [WARN] Daily loss limit: 2026-04-16: down 1,400.00 USD from the day's start balance of 53,200.00 USD; limit 1,596.00 USD (87.7% used)
+  [WARN] Daily loss limit: 2026-04-08: down 1,500.00 USD from the day's start balance of 52,800.00 USD; limit 1,584.00 USD (94.7% used, 84.00 USD of room left); lowest point is trade E4
+  [WARN] Daily loss limit: 2026-04-16: down 1,400.00 USD from the day's start balance of 53,200.00 USD; limit 1,596.00 USD (87.7% used, 196.00 USD of room left); lowest point is trade E8
   [FAIL] Consistency (best day): best day 2026-04-07 = 1,600.00 USD, 88.9% of net profit 1,800.00 USD (max 40.0%); about 2,200.00 USD more profit on other days would bring it within the limit
   [FAIL] Weekend holding: trade E5 (EURUSD) was open over the weekend of 2026-04-10 (market close 17:00 America/New_York)
   [WARN] Lot size: trade E4 (USDJPY) 4 lots vs max 5
   [FAIL] Lot size: trade E6 (NAS100) 6 lots vs max 5
 
 Assumptions and limitations:
-  - Balance starts at 50,000.00 USD (from the rule set) and moves only with closed-trade P/L; deposits, withdrawals and positions still open at export time are not included.
   - A trading day runs from 17:00 to 17:00 in America/New_York and is labelled with the date it ends on; each trade's P/L counts on the day it closed.
   - Touching a limit exactly is a warning; only going beyond it is a violation.
 
 Result: 3 violation(s), 1 near-miss warning(s). Check your firm's current rules; this is not advice.
+```
+
+The same synthetic file against `example-2step-challenge`, whose daily-loss and max-drawdown rules use `measure: equity`. The file has no adverse-excursion column, so those PASS rows are closed balance only. Actual output (exit code `0`: nothing in the closed trades crossed a limit):
+
+```text
+Rule set: Example 2-step challenge, phase 1 (illustrative, not a real firm)
+Trades:   8 (generic, 2026-04-06 to 2026-04-16 UTC)
+Balance:  100,000.00 USD -> 101,800.00 USD (net +1,800.00)
+
+Closed-trade limits (a PASS does not prove these):
+  - Balance starts at 100,000.00 USD (from the rule set) and moves only with closed-trade P/L; deposits, withdrawals and positions still open at export time are not included.
+  - Equity-based limits were checked against closed balance only: the export has no intraday equity or adverse-excursion data. A floating loss that breached an equity limit before the trade closed would NOT show here.
+
+RULE                   STATUS   DETAIL
+Daily loss limit       PASS*    closed balance only (floating loss would not show): worst day 2026-04-08: 1,500.00 USD of 5,000.00 USD (30.0%)
+Max drawdown (static)  PASS*    closed balance only (floating loss would not show): lowest 100,000.00 USD, floor 90,000.00 USD (0.0% used)
+Profit target          PENDING  1,800.00 USD of 8,000.00 USD (22.5%)
+Minimum trading days   PASS     7 trading day(s), minimum 4
+News trading window    SKIPPED  no news events file given (--news)
+Lot size               PASS     largest trade 6 lots (max 20)
+
+* equity-based limit approximated from closed-trade data (see the limits above)
+
+Assumptions and limitations:
+  - A trading day runs from 00:00 to 00:00 in Europe/Prague; each trade's P/L counts on the day it closed.
+  - Touching a limit exactly is a warning; only going beyond it is a violation.
+
+Result: 0 violation(s), 0 near-miss warning(s). Check your firm's current rules; this is not advice.
 ```
 
 The exit code was `1` (violations found).
@@ -124,6 +166,8 @@ prop-rules-check TRADES --rules RULES [options]
                          set this to your MT4/MT5 broker's server zone
   --date-format FMT      strptime pattern for ambiguous dates, e.g. "%m/%d/%Y %H:%M"
   --symbol SYMBOL        symbol for exports that have none (TradingView strategy)
+  --demo                 bundled synthetic history; no trades file. Default preset
+                         is example-1step-trailing. Not a real account.
   --list-presets / --list-formats / --version
 ```
 
@@ -193,7 +237,7 @@ applicable), `SKIPPED` (data missing), `PASS`.
 
 | Rule | Options | How it is checked |
 | --- | --- | --- |
-| `daily_loss` | `limit_pct` or `limit_amount`; `reference`: `initial_balance` \| `day_start_balance`; `measure`: `balance` \| `equity` | For each trading day: start balance = balance at the day reset; loss = start minus the lowest balance (or estimated equity) during the day. Profit earlier in the day does not extend the limit; the low point is what counts. |
+| `daily_loss` | `limit_pct` or `limit_amount`; `reference`: `initial_balance` \| `day_start_balance`; `measure`: `balance` \| `equity` | For each trading day: start balance = balance at the day reset; loss = start minus the lowest balance (or estimated equity) during the day. Profit earlier in the day does not extend the limit; the low point is what counts. A breach or near-miss names the trade at that point and how far over the limit, or how much room is left. |
 | `max_drawdown` | `limit_pct` (of initial) or `limit_amount`; `measure` | Static floor = initial balance - limit. FAIL if any balance/equity point goes below it. |
 | `trailing_drawdown` | `limit_pct`/`limit_amount`; `lock_at`: `initial_balance` \| number \| null; `measure` | Floor = highest **closed** balance so far - limit. With `lock_at`, the floor stops rising once it reaches that level. Each point is checked against the floor in force before that close. |
 | `profit_target` | `target_pct` or `target_amount` | PASS if final balance - initial >= target, else PENDING with progress; notes if the target was reached earlier and then given back. |
@@ -204,6 +248,8 @@ applicable), `SKIPPED` (data missing), `PASS`.
 | `lot_size` | `max_lots_per_trade`, `max_open_lots` | Per-trade volume, and the peak sum of volumes open at the same time (a close and an open at the same instant don't overlap). |
 
 ### Assumptions and limitations (read these)
+
+The text report prints **Closed-trade limits** above the status table. Read that block before treating a PASS as a clean account. The same strings are the JSON field `limitations` (they also remain inside `assumptions`). Parser decisions that do not change what a PASS means, such as the trading-day boundary, stay under **Assumptions and limitations**.
 
 - **Closed-trade data cannot see intraday equity.** History exports list closed
   positions, not tick-by-tick equity. With `measure: equity`:
@@ -240,7 +286,7 @@ Columns are matched **by name**, so reordered or extra columns are fine.
 | `--format` | Export | Columns used | Verification status |
 | --- | --- | --- | --- |
 | `mt4` | MT4 Terminal > Account History > *Save as Report* / *Save as Detailed Report* (HTML), or that table as CSV | Closed Transactions: Ticket, Open Time, Type, Size, Item, Price, S / L, T / P, Close Time, Price, Commission, Taxes, Swap, Profit | Column list checked against the official [MT4 help](https://www.metatrader4.com/en/trading-platform/help/overview/terminal/terminal_account_history) and several journal-importer docs. **Not tested against a real statement file**; fixture is synthetic. |
-| `mt5` | MT5 Toolbox > History (Positions view) > *Report* > HTML (UTF-16 handled), or that table as CSV | Positions: Time, Position, Symbol, Type, Volume, Price, S / L, T / P, Time, Price, Commission, Swap, Profit | Column list and "Profit is gross" from third-party importer docs (no official MetaQuotes page found). **Not tested against a real report**. The XML/Excel report is not supported. |
+| `mt5` | MT5 Toolbox > History (Positions view) > *Report* > HTML (UTF-16 handled), or that table as CSV | Positions: Time, Position, Symbol, Type, Volume, Price, S / L, T / P, Time, Price, Commission, Swap, Profit | Column list and "Profit is gross" from third-party importer docs (no official MetaQuotes page found). **Not tested against a real report**. A Deals table is rejected with an instruction to export Positions. The XML/Excel report is not supported. |
 | `ctrader` | cTrader History tab > export / Statement saved as CSV | ID, Symbol, Opening direction, Opening/Closing time, Entry/Closing price, Closing quantity, Swap, Commission(s), Gross, Net | Column names from the official [cTrader help](https://help.ctrader.com/ctrader/trading/history/). Exact CSV details (date format, `(UTC+x)` header suffix, currency suffix like `Net EUR`) are from third-party docs and **unverified**; dates are read day-first. Enable lots for quantities. |
 | `tradingview` | TradingView Strategy Tester > List of trades > download CSV | Trade #, Type (Entry/Exit long/short), Date/Time, Price, size (qty/Contracts), Net P&L/Profit, Drawdown | Columns per the official [Pine Script docs](https://www.tradingview.com/pine-script-docs/concepts/strategies/) and third-party docs; current (`Net P&L USD`) and older (`Profit`) headers both handled. No symbol column: use `--symbol`. |
 | `tradingview-paper` | TradingView Paper Trading > Balance history CSV | Time, Balance Before/After, Realized P&L, Action | **Best effort / unverified**: only third-party descriptions found. Symbol and side are parsed from the Action text; there are no open times, so weekend, news-at-open and open-lot checks can't run (reported as such). |
@@ -248,10 +294,19 @@ Columns are matched **by name**, so reordered or extra columns are fine.
 
 Not supported yet: MT5 XML report, MT5 Deals-only reports, Match-Trader,
 DXtrade, TradeLocker, NinjaTrader, Rithmic/Tradovate. Exports from those can be
-converted to the generic CSV.
+converted to the generic CSV. A file the checker does not understand fails
+before any rule runs, and the message says what to export instead:
+
+- Excel `.xlsx` / `.xls` (and other zip or OLE workbooks): save as CSV, or save the MT4/MT5 HTML report.
+- MT5 **Deals** (one row per fill): not rebuilt into positions. Export the **Positions** view.
+- MT4 HTML that only has **Open Trades**: open positions are not checked. Save the Account History report that includes **Closed Transactions**.
+- A generic CSV missing `close_time` or `pnl`/`profit`: the error names the missing column.
+- A title row above a known header is skipped. The report says how many rows that was.
+
+Dates like `02/03/2026` are read day-first (2 March). When that string is also a valid month-first date, the report says so. Pass `--date-format '%m/%d/%Y %H:%M'` for a month-first file. A slash date that cannot be day-first, such as `03/15/2026`, is an error until you pass `--date-format`.
 
 If a parser gets your file wrong, please open a "New platform / export format"
-issue with an anonymised header and a few rows.
+issue with an anonymised header and a few rows. Do not send a live account statement.
 
 ### Generic CSV
 
@@ -262,7 +317,7 @@ T1,EURUSD,buy,1.0,2026-03-02T09:00:00Z,2026-03-02T11:00:00Z,300.00,-7,0,-150
 
 | Column | Required | Meaning |
 | --- | --- | --- |
-| `close_time` | yes | ISO 8601 (with offset or `Z`), or naive in `--source-tz` |
+| `close_time` | yes | ISO 8601 (with offset or `Z`), or naive in `--source-tz`. Slash dates are read day-first; ambiguous ones are named in the report |
 | `pnl` | yes\* | **net** realised P/L in account currency |
 | `profit` | \* | gross P/L; used if `pnl` is absent, with `commission` and `swap` added |
 | `open_time` | recommended | needed for weekend, news-at-open, open lots, `count_by: open` |

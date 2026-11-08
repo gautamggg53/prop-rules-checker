@@ -73,8 +73,8 @@ def parse_ctrader(
         notes.append("cTrader: using the 'Net USD' column; limits are compared in USD.")
     if i_open is None:
         notes.append(
-            "cTrader: no 'Opening time' column, so weekend, news-at-open and open-lot "
-            "checks are limited."
+            "Data limit: cTrader export has no 'Opening time' column, so weekend, "
+            "news-at-open and open-lot checks are limited."
         )
     trades: list[Trade] = []
     for n, row in enumerate(rows[1:], start=2):

@@ -128,7 +128,10 @@ def parse_tradingview(
             "(pass --symbol so news events can be matched)."
         )
     if open_left:
-        notes.append(f"TradingView: skipped {open_left} trade(s) that were still open.")
+        notes.append(
+            f"Data limit: skipped {open_left} TradingView trade(s) that were still open. "
+            "Their floating P/L is not included."
+        )
     notes.append("TradingView: quantities are contracts/units as exported, not necessarily lots.")
     if any(t.mae is not None for t in trades):
         notes.append(
@@ -215,8 +218,8 @@ def parse_tradingview_paper(
             )
     notes = [
         "TradingView paper: format is not officially documented; parsed from the Action text.",
-        "TradingView paper: no open times are exported, so weekend-holding, news-at-open and "
-        "open-lot checks cannot be evaluated; minimum trading days are counted by close date.",
+        "Data limit: TradingView paper exports no open times, so weekend-holding, news-at-open "
+        "and open-lot checks cannot be evaluated; minimum trading days are counted by close date.",
         "TradingView paper: quantities are units, not lots.",
     ]
     return TradeHistory(

@@ -37,6 +37,13 @@ def _pct(x: float) -> str:
     return f"{x * 100:.1f}%"
 
 
+def _closed_only_prefix(ctx: _Context, use_equity: bool) -> str:
+    """Mark an equity rule that had nothing but closed balances to look at."""
+    if use_equity and not ctx.has_mae:
+        return "closed balance only (floating loss would not show): "
+    return ""
+
+
 def _amount(cfg: dict[str, Any], reference: float) -> float:
     if "limit_amount" in cfg:
         return float(cfg["limit_amount"])
@@ -161,12 +168,17 @@ def _daily_loss(ctx: _Context, cfg: dict[str, Any]) -> RuleResult:
         if status is not Status.PASS:
             when = info["breach_time"] or info["low_time"]
             tid = info["breach_id"] or info["low_id"]
+            if status is Status.FAIL:
+                margin = f"over by {ctx.m(loss - info['limit'])}"
+            else:
+                margin = f"{ctx.m(info['limit'] - loss)} of room left"
+            trade = f"; lowest point is trade {tid}" if tid else ""
             findings.append(
                 Finding(
                     status,
                     f"{d}: down {ctx.m(loss)} from the day's start "
                     f"balance of {ctx.m(info['start'])}; limit "
-                    f"{ctx.m(info['limit'])} ({_pct(usage)} used)",
+                    f"{ctx.m(info['limit'])} ({_pct(usage)} used, {margin}){trade}",
                     when,
                     (tid,) if tid else (),
                     loss,
@@ -175,7 +187,7 @@ def _daily_loss(ctx: _Context, cfg: dict[str, Any]) -> RuleResult:
             )
     status = worst([f.status for f in findings])
     w = next(r for r in table if r["day"] == worst_day)
-    summary = (
+    summary = _closed_only_prefix(ctx, use_eq) + (
         f"worst day {worst_day}: {ctx.m(w['loss'])} of {ctx.m(w['limit'])} ({_pct(w['usage'])})"
     )
     return RuleResult(
@@ -221,7 +233,9 @@ def _max_drawdown(ctx: _Context, cfg: dict[str, Any]) -> RuleResult:
                 floor,
             )
         )
-    summary = f"lowest {ctx.m(low)}, floor {ctx.m(floor)} ({_pct(used / amount)} used)"
+    summary = _closed_only_prefix(ctx, cfg["measure"] == "equity") + (
+        f"lowest {ctx.m(low)}, floor {ctx.m(floor)} ({_pct(used / amount)} used)"
+    )
     return RuleResult(
         "max_drawdown",
         "Max drawdown (static)",
@@ -288,7 +302,7 @@ def _trailing(ctx: _Context, cfg: dict[str, Any]) -> RuleResult:
         final_floor = lock_level
     status = worst([f.status for f in findings])
     lock_text = f", locked at {ctx.m(lock_level)}" if locked_at else ""
-    summary = (
+    summary = _closed_only_prefix(ctx, cfg["measure"] == "equity") + (
         f"high-water {ctx.m(hwm)}, current floor {ctx.m(final_floor)}{lock_text} "
         f"(max {_pct(max_usage)} used)"
     )
@@ -707,6 +721,11 @@ def check(
                 "equity limit before the trade closed would NOT show here."
             )
     assumptions.extend(history.notes)
+    # Shown above the status table. A PASS underneath does not cancel these.
+    limitations = [assumptions[0]]
+    for item in assumptions[1:]:
+        if item.startswith(("Equity-based limits", "Data limit:")):
+            limitations.append(item)
     first_open = min((t.open_time for t in ctx.trades if t.open_time), default=None)
     start = min(filter(None, [first_open, ctx.trades[0].close_time]))
     final = ctx.series("balance")[-1].value
@@ -722,4 +741,5 @@ def check(
         warn_at=level,
         results=results,
         assumptions=assumptions,
+        limitations=limitations,
     )

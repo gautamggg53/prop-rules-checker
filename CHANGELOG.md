@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `prop-rules-check --demo` checks a synthetic history bundled in the install, so a fresh install does not need the `examples/` directory or a trades file. `python -m prop_rules_checker` is the same entry point when the console script is not on `PATH`.
+- Text reports print **Closed-trade limits** above the status table (also the JSON field `limitations`). Equity rules with no adverse-excursion data say, on the rule row, that a floating loss would not show.
+- Daily-loss breaches and near-misses name the trade at the worst point and the amount over the limit, or the room left.
+- Unrecognised files name the export to use: Excel workbooks, an MT5 Deals table, an MT4 Open-Trades-only HTML file, and a generic CSV missing `close_time` or `pnl`.
+- Still-open positions listed in an MT4, MT5 or TradingView export are counted in the report. They are still not checked.
+- A title row above a known CSV header is skipped. Slash dates that are valid both day-first and month-first stay day-first, and the report says so.
+
 ### Fixed
 
 - CSV files that start with Excel's `sep=;` line (common in semicolon-delimited

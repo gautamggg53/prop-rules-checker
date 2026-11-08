@@ -160,6 +160,13 @@ def test_ctrader_header_timezone_and_net(fixtures):
     assert t.open_time == datetime(2026, 3, 2, 8, 15, 0, 120000, tzinfo=timezone.utc)
     assert t.pnl == pytest.approx(381.10)
     assert t.volume == 1.0
+    # 02/03/2026 is also a valid 3 February. The read stays day-first and says so.
+    assert any("day-first" in n for n in h.notes)
+    explicit = load_trades(
+        fixtures / "synthetic_ctrader_history.csv", date_format="%d/%m/%Y %H:%M:%S.%f"
+    )
+    assert explicit.trades[0].open_time == t.open_time
+    assert not any("day-first" in n for n in explicit.notes)
 
 
 def test_ctrader_gross_fallback_and_errors(tmp_path):
@@ -298,3 +305,150 @@ def test_semicolon_csv_uses_decimal_comma(tmp_path):
     p = tmp_path / "s.csv"
     p.write_text("close_time;pnl\n2026-03-02 10:00;1,500\n")
     assert load_trades(p).trades[0].pnl == 1.5
+
+
+def test_excel_workbook_is_rejected_with_export_help(tmp_path):
+    p = tmp_path / "book.xlsx"
+    p.write_bytes(b"PK\x03\x04" + b"not really a workbook")
+    with pytest.raises(InputError, match="Excel workbook"):
+        load_trades(p)
+    p.write_bytes(b"\xd0\xcf\x11\xe0" + b"old xls")
+    with pytest.raises(InputError, match="Excel workbook"):
+        load_trades(p)
+
+
+def test_mt5_deals_export_explains_the_positions_view(tmp_path):
+    header = (
+        "Time,Deal,Symbol,Type,Direction,Volume,Price,Order,Commission,Fee,Swap,"
+        "Profit,Balance,Comment\n"
+    )
+    row = "2026.03.09 09:00:00,1,EURUSD,buy,in,1,1.1,2,0,0,0,10,100010,\n"
+    p = tmp_path / "deals.csv"
+    p.write_text("Account statement\n" + header + row)
+    with pytest.raises(InputError, match="Positions"):
+        load_trades(p)
+    with pytest.raises(InputError, match="Deals"):
+        load_trades(p, "mt5")
+    html = tmp_path / "deals.html"
+    html.write_text(
+        "<html><table><tr><td>Deals</td></tr><tr>"
+        + "".join(f"<td>{c}</td>" for c in header.strip().split(","))
+        + "</tr><tr>"
+        + "".join(f"<td>{c}</td>" for c in row.strip().split(","))
+        + "</tr></table></html>"
+    )
+    with pytest.raises(InputError, match="Deals"):
+        load_trades(html)
+
+
+def test_mt4_open_trades_only_html_says_what_to_export(tmp_path):
+    p = tmp_path / "open.html"
+    p.write_text(
+        "<html><table><tr><td>Open Trades:</td></tr>"
+        "<tr><td>Ticket</td><td>Open Time</td><td>Type</td><td>Size</td><td>Item</td>"
+        "<td>Price</td></tr>"
+        "<tr><td>5</td><td>2026.03.02 10:00</td><td>buy</td><td>1.00</td><td>EURUSD</td>"
+        "<td>1.1</td></tr></table></html>"
+    )
+    with pytest.raises(InputError, match="Open Trades"):
+        load_trades(p)
+
+
+def test_closed_section_with_only_open_trades_names_them(tmp_path):
+    p = tmp_path / "only-open.html"
+    p.write_text(
+        "<html><table>"
+        "<tr><td>Closed Transactions:</td></tr>"
+        "<tr><td>Ticket</td><td>Open Time</td><td>Type</td><td>Size</td><td>Item</td>"
+        "<td>Price</td><td>S / L</td><td>T / P</td><td>Close Time</td><td>Price</td>"
+        "<td>Commission</td><td>Taxes</td><td>Swap</td><td>Profit</td></tr>"
+        "<tr><td>Open Trades:</td></tr>"
+        "<tr><td>9</td><td>2026.03.06 10:00</td><td>sell</td><td>2.00</td><td>GBPUSD</td>"
+        "<td>1.25</td></tr>"
+        "</table></html>"
+    )
+    with pytest.raises(InputError, match="no closed trades found") as exc:
+        load_trades(p)
+    assert "1 still-open position" in str(exc.value)
+
+
+def test_mt4_counts_open_positions_that_were_left_out(tmp_path):
+    p = tmp_path / "both.html"
+    p.write_text(
+        "<html><table>"
+        "<tr><td>Closed Transactions:</td></tr>"
+        "<tr><td>Ticket</td><td>Open Time</td><td>Type</td><td>Size</td><td>Item</td>"
+        "<td>Price</td><td>S / L</td><td>T / P</td><td>Close Time</td><td>Price</td>"
+        "<td>Commission</td><td>Taxes</td><td>Swap</td><td>Profit</td></tr>"
+        "<tr><td>1</td><td>2026.03.02 10:00</td><td>buy</td><td>1.00</td><td>EURUSD</td>"
+        "<td>1.08</td><td></td><td></td><td>2026.03.02 11:00</td><td>1.09</td>"
+        "<td>0</td><td>0</td><td>0</td><td>10</td></tr>"
+        "<tr><td>Open Trades:</td></tr>"
+        "<tr><td>Ticket</td><td>Open Time</td><td>Type</td><td>Size</td><td>Item</td>"
+        "<td>Price</td></tr>"
+        "<tr><td>9</td><td>2026.03.06 10:00</td><td>sell</td><td>2.00</td><td>GBPUSD</td>"
+        "<td>1.25</td></tr>"
+        "<tr><td>Working Orders:</td></tr>"
+        "</table></html>"
+    )
+    h = load_trades(p)
+    assert [t.id for t in h] == ["1"]
+    assert any("1 still-open position" in n for n in h.notes)
+
+
+def test_title_row_before_header_is_skipped(tmp_path):
+    p = tmp_path / "titled.csv"
+    p.write_text("My export\nclose_time,pnl\n2026-03-02 10:00,5\n")
+    h = load_trades(p)
+    assert h.format == "generic" and h.trades[0].pnl == 5
+    assert any("Skipped 1 leading row" in n for n in h.notes)
+
+
+def test_generic_header_missing_pnl_names_the_column(tmp_path):
+    p = tmp_path / "half.csv"
+    p.write_text("close_time,symbol\n2026-03-02 10:00,EURUSD\n")
+    with pytest.raises(InputError, match="missing pnl or profit"):
+        load_trades(p)
+    p.write_text("pnl,symbol\n10,EURUSD\n")
+    with pytest.raises(InputError, match="missing close_time"):
+        load_trades(p)
+
+
+def test_open_trades_html_without_a_header_explains_the_export(tmp_path):
+    p = tmp_path / "open.html"
+    p.write_text(
+        "<html><table><tr><td>Open Trades:</td></tr><tr><td>pending</td></tr></table></html>"
+    )
+    with pytest.raises(InputError, match="no Closed Transactions"):
+        load_trades(p)
+
+
+def test_mt5_open_positions_are_counted(tmp_path):
+    p = tmp_path / "mt5.html"
+    p.write_text(
+        "<html><table>"
+        "<tr><td>Positions</td></tr>"
+        "<tr><td>Time</td><td>Position</td><td>Symbol</td><td>Type</td><td>Volume</td>"
+        "<td>Price</td><td>S / L</td><td>T / P</td><td>Time</td><td>Price</td>"
+        "<td>Commission</td><td>Swap</td><td>Profit</td></tr>"
+        "<tr><td>2026.03.02 10:00</td><td>1</td><td>EURUSD</td><td>buy</td><td>1</td>"
+        "<td>1.1</td><td></td><td></td><td>2026.03.02 11:00</td><td>1.2</td>"
+        "<td>0</td><td>0</td><td>10</td></tr>"
+        "<tr><td>Open Positions</td></tr>"
+        "<tr><td>2026.03.06 10:00</td><td>9</td><td>GBPUSD</td><td>sell</td><td>2</td>"
+        "<td>1.25</td></tr>"
+        "</table></html>"
+    )
+    h = load_trades(p)
+    assert [t.id for t in h] == ["1"]
+    assert any("1 still-open position" in n for n in h.notes)
+
+
+def test_ambiguous_generic_dates_are_called_out(tmp_path):
+    p = tmp_path / "us.csv"
+    p.write_text("close_time,pnl\n03/02/2026 10:00,5\n15/03/2026 10:00,1\n")
+    h = load_trades(p)
+    # 03/02 is ambiguous (read as 3 February); 15/03 can only be 15 March.
+    assert h.trades[0].close_time.day == 3 and h.trades[0].close_time.month == 2
+    assert h.trades[1].close_time.day == 15 and h.trades[1].close_time.month == 3
+    assert any("1 timestamp" in n and "day-first" in n for n in h.notes)

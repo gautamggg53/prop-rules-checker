@@ -5,6 +5,9 @@ from __future__ import annotations
 import csv
 import io
 import re
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import datetime, timedelta, timezone, tzinfo
 from html.parser import HTMLParser
 from pathlib import Path
@@ -96,6 +99,33 @@ def parse_number(
     return -value if neg else value
 
 
+# Day-first patterns that are also valid month-first when both numbers are <= 12.
+_DAY_FIRST_PREFIXES = ("%d/%m/%Y", "%d.%m.%Y")
+_AMBIGUOUS_DATES: ContextVar[list[str] | None] = ContextVar("prc_ambiguous_dates", default=None)
+
+
+@contextmanager
+def collect_ambiguous_dates() -> Iterator[list[str]]:
+    """Record slash/dot dates that were valid as both day-first and month-first."""
+    bucket: list[str] = []
+    token = _AMBIGUOUS_DATES.set(bucket)
+    try:
+        yield bucket
+    finally:
+        _AMBIGUOUS_DATES.reset(token)
+
+
+def _remember_if_ambiguous(text: str, matched: str | None) -> None:
+    bucket = _AMBIGUOUS_DATES.get()
+    if bucket is None or matched is None:
+        return
+    if not any(matched.startswith(prefix) for prefix in _DAY_FIRST_PREFIXES):
+        return
+    nums = re.findall(r"\d+", text)
+    if len(nums) >= 3 and 1 <= int(nums[0]) <= 12 and 1 <= int(nums[1]) <= 12:
+        bucket.append(text)
+
+
 def parse_datetime(
     text: str, tz: tzinfo, *, fmt: str | None = None, field: str = "time"
 ) -> datetime:
@@ -104,6 +134,7 @@ def parse_datetime(
     if not s:
         raise InputError(f"missing {field}")
     dt: datetime | None = None
+    matched: str | None = None
     if fmt:
         try:
             dt = datetime.strptime(s, fmt)
@@ -117,13 +148,17 @@ def parse_datetime(
             for f in _DATE_FORMATS:
                 try:
                     dt = datetime.strptime(s, f)
-                    break
                 except ValueError:
                     continue
+                matched = f
+                break
     if dt is None:
         raise InputError(
             f"could not parse {field} {s!r}; pass --date-format, e.g. '%m/%d/%Y %H:%M'"
         )
+    # An explicit --date-format is the user's choice; only auto-detected dates are noted.
+    if fmt is None:
+        _remember_if_ambiguous(s, matched)
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=tz)
     return dt.astimezone(timezone.utc)
@@ -138,6 +173,12 @@ def read_text(path: str | Path) -> str:
         raise InputError(f"file not found: {p}") from exc
     except OSError as exc:
         raise InputError(f"cannot read {p}: {exc}") from exc
+    if raw.startswith(b"PK\x03\x04") or raw.startswith(b"\xd0\xcf\x11\xe0"):
+        raise InputError(
+            f"{p}: this is an Excel workbook (.xlsx/.xls) or another binary file, not a "
+            "CSV or HTML report. Save it as CSV, or from MT4/MT5 save the HTML report. "
+            "Workbooks are not read."
+        )
     if raw.startswith((b"\xff\xfe", b"\xfe\xff")):
         return raw.decode("utf-16")
     if len(raw) > 4 and raw[1:4:2] == b"\x00\x00" and raw[0] != 0:

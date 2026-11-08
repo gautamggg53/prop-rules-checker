@@ -6,6 +6,7 @@ import pytest
 
 from conftest import ruleset, trade, utc
 from prop_rules_checker import NewsEvent, Status, TradeHistory, check
+from prop_rules_checker.report import render_text
 
 DAILY = {"daily_loss": {"limit_pct": 5}}
 
@@ -25,6 +26,7 @@ def test_daily_loss_pass_warn_fail():
     res = fail.result("daily_loss")
     assert res.status is Status.FAIL and fail.has_violations
     assert res.findings[0].trade_ids == ("b",)
+    assert "trade b" in res.findings[0].message and "over by" in res.findings[0].message
 
 
 def test_daily_loss_exact_limit_is_warning_not_violation():
@@ -89,6 +91,11 @@ def test_daily_loss_amount_and_equity_with_mae():
     no_mae = check([trade("a", "2026-03-02T10:00", -200)], rules)
     assert no_mae.result("daily_loss").status is Status.PASS
     assert any("would NOT show" in a for a in no_mae.assumptions)
+    assert "closed balance only" in no_mae.result("daily_loss").summary
+    text = render_text(no_mae)
+    assert text.index("Closed-trade limits") < text.index("RULE")
+    assert "would NOT show" in text.split("RULE")[0]
+    assert "would NOT show" not in text.split("Assumptions and limitations:")[1]
 
 
 def test_equity_estimate_sums_overlapping_trades():

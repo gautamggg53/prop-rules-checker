@@ -66,6 +66,7 @@ class Report:
     warn_at: float
     results: list[RuleResult]
     assumptions: list[str]
+    limitations: list[str] = field(default_factory=list)
 
     @property
     def violations(self) -> list[RuleResult]:
@@ -123,6 +124,7 @@ class Report:
                     }
                     for r in self.results
                 ],
+                "limitations": self.limitations,
                 "assumptions": self.assumptions,
             }
         )
@@ -172,6 +174,10 @@ def render_text(report: Report, *, max_findings: int = 10) -> str:
         f"{money(report.final_balance, report.currency)} "
         f"(net {report.final_balance - report.initial_balance:+,.2f})"
     )
+    if report.limitations:
+        lines.append("")
+        lines.append("Closed-trade limits (a PASS does not prove these):")
+        lines.extend(f"  - {item}" for item in report.limitations)
     lines.append("")
     width = max(len(r.title) for r in report.results)
     lines.append(f"{'RULE':<{width}}  {'STATUS':<8} DETAIL")
@@ -190,10 +196,14 @@ def render_text(report: Report, *, max_findings: int = 10) -> str:
             lines.append(f"  ... {len(flagged) - max_findings} more (use --json for all)")
     if any(r.approximated for r in report.results):
         lines.append("")
-        lines.append("* equity-based limit approximated from closed-trade data (see assumptions)")
+        lines.append(
+            "* equity-based limit approximated from closed-trade data (see the limits above)"
+        )
     lines.append("")
     lines.append("Assumptions and limitations:")
-    lines.extend(f"  - {a}" for a in report.assumptions)
+    hoisted = set(report.limitations)
+    rest = [a for a in report.assumptions if a not in hoisted]
+    lines.extend(f"  - {a}" for a in rest)
     lines.append("")
     v, w = len(report.violations), len(report.warnings)
     verdict = f"{v} violation(s), {w} near-miss warning(s)"

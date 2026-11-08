@@ -91,3 +91,52 @@ def test_python_dash_m():
         check=True,
     )
     assert "0.1.0" in proc.stdout
+
+
+def test_demo_works_from_an_empty_directory(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    assert main(["--demo"]) == 1
+    out = capsys.readouterr().out
+    assert "not a real account" in out
+    assert "Weekend holding" in out and "FAIL" in out
+    assert "lowest point is trade" in out
+    assert out.index("Closed-trade limits") < out.index("RULE")
+    assert "positions still open at export time are not included" in out.split("RULE")[0]
+
+
+def test_demo_json_stays_machine_readable(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    # The 2-step preset on this file has no breach; the point is a clean JSON document.
+    assert main(["--demo", "--json", "-r", "example-2step-challenge"]) == 0
+    captured = capsys.readouterr()
+    data = json.loads(captured.out)
+    assert data["source_format"] == "generic"
+    assert data["rules_name"].startswith("Example 2-step")
+    assert any("would NOT show" in item for item in data["limitations"])
+    assert "not a real account" in captured.err
+    assert "not a real account" not in captured.out
+
+
+def test_demo_rejects_a_trades_path(capsys):
+    assert main(["--demo", EXAMPLE]) == 2
+    assert "does not take a trades path" in capsys.readouterr().err
+
+
+def test_equity_limit_is_stated_before_statuses(capsys):
+    assert main([EXAMPLE, "-r", "example-2step-challenge"]) == 0
+    out = capsys.readouterr().out
+    head = out.split("RULE")[0]
+    assert "would NOT show" in head
+    assert "closed balance only (floating loss would not show)" in out
+    assert "limits above" in out
+
+
+def test_packaged_demo_matches_example_file():
+    from importlib.resources import files
+
+    packaged = (
+        files("prop_rules_checker")
+        .joinpath("data", "synthetic_quickstart.csv")
+        .read_text(encoding="utf-8")
+    )
+    assert packaged == Path(EXAMPLE).read_text(encoding="utf-8")

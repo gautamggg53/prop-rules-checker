@@ -23,6 +23,14 @@ from .common import norm, parse_datetime, parse_number
 _MT4_SECTION_END = ("open trades", "working orders", "summary", "closed p/l")
 _MT5_SECTION_END = ("orders", "deals", "open positions", "working orders", "results", "summary")
 
+MT5_DEALS_NOT_SUPPORTED = (
+    "this is an MT5 Deals export (one row per fill, not per closed position). "
+    "The checker reads the Positions table, which has both an open time and a close time. "
+    "In MT5: Toolbox → History, switch the view to Positions, then right-click → Report "
+    "and save HTML (or copy that table to CSV). The XML/Excel report is not supported. "
+    "A Deals-only file is not reconstructed into positions."
+)
+
 
 def _indices(header: list[str]) -> dict[str, list[int]]:
     idx: dict[str, list[int]] = {}
@@ -56,6 +64,44 @@ def _is_mt5_header(row: list[str]) -> bool:
         and "symbol" in keys
         and "volume" in keys
         and len(keys.get("time", [])) >= 2
+    )
+
+
+def _is_mt5_deals_header(row: list[str]) -> bool:
+    keys = _indices(row)
+    return "deal" in keys and "direction" in keys and "profit" in keys and "position" not in keys
+
+
+def _count_section_trades(
+    rows: list[list[str]], start: tuple[str, ...], stop: tuple[str, ...]
+) -> int:
+    """Count buy/sell rows in a named HTML section (open trades, open positions)."""
+    active = False
+    count = 0
+    for row in rows:
+        joined = norm(" ".join(c for c in row if c))
+        if any(joined.startswith(s) for s in start):
+            active = True
+            continue
+        if active and any(joined.startswith(s) for s in stop):
+            active = False
+            continue
+        # MT4 tickets are the first cell; MT5 open-position rows start with a time.
+        # A cell that is exactly buy or sell is the type column, not a header.
+        if not active or not row:
+            continue
+        if any(norm(c) in ("buy", "sell") for c in row):
+            count += 1
+    return count
+
+
+def _open_position_note(count: int, platform: str) -> str | None:
+    if not count:
+        return None
+    return (
+        f"Data limit: the {platform} export lists {count} still-open position(s). "
+        "Their floating P/L is not included, so a breach that exists only while they "
+        "are open cannot show."
     )
 
 
@@ -147,11 +193,24 @@ def parse_mt4(
             )
         )
     if header is None:
+        if any(norm(" ".join(c for c in r if c)).startswith("open trades") for r in rows):
+            raise InputError(
+                "no MT4 'Closed Transactions' table header was found. An Open Trades "
+                "section is present, but open positions are not checked. In MT4 Account "
+                "History use Save as Report (or Save as Detailed Report) so the file "
+                "includes Closed Transactions (Ticket, Open Time, Type, Size, Item, ...)."
+            )
         raise InputError(
             "no MT4 'Closed Transactions' table header (Ticket, Open Time, Type, "
             "Size, Item, ...) was found"
         )
     notes.append("MT4: net P/L per trade = Profit + Commission + Taxes + Swap.")
+    open_note = _open_position_note(
+        _count_section_trades(rows, ("open trades",), ("working orders", "summary", "closed p/l")),
+        "MT4",
+    )
+    if open_note:
+        notes.append(open_note)
     if skipped_balance:
         notes.append(
             f"MT4: ignored balance/credit operations totalling {skipped_balance:,.2f} "
@@ -235,14 +294,26 @@ def parse_mt5(
             )
         )
     if header is None:
+        if any(_is_mt5_deals_header(r) for r in rows):
+            raise InputError(MT5_DEALS_NOT_SUPPORTED)
         where = "in the 'Positions' section" if seen_section else "(no 'Positions' section found)"
         raise InputError(
             f"no MT5 Positions table header {where}. Save the report from the "
-            "History tab with the Positions view as HTML (the XML/Excel report "
-            "is not supported)."
+            "History tab with the Positions view as HTML (the Deals table and the "
+            "XML/Excel report are not supported)."
         )
     notes = [
         "MT5: net P/L per position = Profit + Commission + Swap (Profit is gross in the "
         "Positions table)."
     ]
+    open_note = _open_position_note(
+        _count_section_trades(
+            rows,
+            ("open positions",),
+            ("orders", "deals", "working orders", "results", "summary", "positions"),
+        ),
+        "MT5",
+    )
+    if open_note:
+        notes.append(open_note)
     return TradeHistory(trades=trades, format="mt5", source=source, notes=notes)

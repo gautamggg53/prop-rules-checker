@@ -55,8 +55,17 @@ jobs:
         run: |
           python -m venv /tmp/smoke
           /tmp/smoke/bin/pip install dist/*.whl
+          cd /tmp
           /tmp/smoke/bin/prop-rules-check --version
-          /tmp/smoke/bin/prop-rules-check examples/sample-trades.csv --rules example-1step-trailing || test $? -eq 1
+          set +e
+          /tmp/smoke/bin/prop-rules-check --demo > /tmp/demo-out.txt
+          code=$?
+          set -e
+          test "$code" -eq 1
+          grep -q "not a real account" /tmp/demo-out.txt
+          grep -q "Closed-trade limits" /tmp/demo-out.txt
+          grep -q "lowest point is trade" /tmp/demo-out.txt
+          /tmp/smoke/bin/python -m prop_rules_checker --version
       - uses: actions/upload-artifact@v4
         with:
           name: dist
