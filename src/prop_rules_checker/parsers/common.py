@@ -59,7 +59,8 @@ def parse_number(
     Handles currency symbols, ``1 234.56`` and ``1,234.56`` thousands separators,
     ``(12.50)`` and unicode-minus negatives, ``0.10 Lots`` and ``0.1 / 0.1``.
     With ``decimal_comma`` a lone comma is a decimal separator; otherwise a lone
-    comma followed by exactly three digits is read as a thousands separator.
+    comma followed by exactly three digits is read as a thousands separator,
+    unless the integer part is zero (``0,125`` is 0.125, not 125).
     """
     if text is None:
         s = ""
@@ -85,7 +86,10 @@ def parse_number(
             s = s.replace(",", "")
     elif "," in s:
         parts = s.split(",")
-        if decimal_comma or (len(parts) == 2 and len(parts[1]) != 3):
+        # "0,125" can't be thousands grouping (no grouped number starts with 0),
+        # so a lone comma after a zero integer part is always a decimal comma.
+        zero_int = parts[0].lstrip("+-") in ("", "0")
+        if decimal_comma or (len(parts) == 2 and (len(parts[1]) != 3 or zero_int)):
             s = s.replace(",", ".") if len(parts) == 2 else s.replace(",", "")
         else:
             s = s.replace(",", "")

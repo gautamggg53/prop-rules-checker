@@ -27,6 +27,10 @@ from prop_rules_checker.parsers.common import (
         ("2 / 2", 2),
         ("1,5", 1.5),
         ("1,500", 1500),
+        ("0,125", 0.125),
+        ("-0,500", -0.5),
+        (",250", 0.25),
+        ("(0,750)", -0.75),
         ("+3", 3),
         ("12", 12),
         (7, 7.0),
@@ -298,3 +302,13 @@ def test_semicolon_csv_uses_decimal_comma(tmp_path):
     p = tmp_path / "s.csv"
     p.write_text("close_time;pnl\n2026-03-02 10:00;1,500\n")
     assert load_trades(p).trades[0].pnl == 1.5
+
+
+def test_tab_csv_zero_comma_volume_is_not_thousands(tmp_path):
+    # Tab-delimited exports don't switch on decimal_comma, so a European "0,100"
+    # lot size must still read as 0.1 lots rather than 100 lots.
+    p = tmp_path / "t.csv"
+    p.write_text("close_time\tpnl\tvolume\n2026-03-02 10:00\t12\t0,100\n")
+    trade = load_trades(p).trades[0]
+    assert trade.volume == pytest.approx(0.1)
+    assert trade.pnl == 12

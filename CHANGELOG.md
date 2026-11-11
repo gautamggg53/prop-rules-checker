@@ -13,6 +13,10 @@ All notable changes to this project are documented here. The format follows
   is no longer mistaken for the header.
 - Delimiter sniffing ignores commas inside quoted header cells, so a header like
   `"Profit, USD";"Close time"` is split on `;` rather than `,`.
+- Numbers like `0,125` or `-0,500` (decimal comma, zero integer part) are read
+  as 0.125 and -0.5 even when the file isn't detected as decimal-comma, e.g. a
+  tab-delimited export. Previously they were taken as thousands grouping, so a
+  `0,100` lot size became 100 lots.
 
 ## [0.1.0] - 2026-11-03
 
