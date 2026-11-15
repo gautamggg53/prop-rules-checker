@@ -17,6 +17,10 @@ All notable changes to this project are documented here. The format follows
   as 0.125 and -0.5 even when the file isn't detected as decimal-comma, e.g. a
   tab-delimited export. Previously they were taken as thousands grouping, so a
   `0,100` lot size became 100 lots.
+- Amounts with more than one dot used as thousands separators and no decimal
+  part, such as `1.234.567` or `-1.250.000` (common in German and Italian
+  exports), are read as 1234567 and -1250000 instead of failing with
+  "expected a number". Misgrouped values like `1.23.456` are still rejected.
 
 ## [0.1.0] - 2026-11-03
 

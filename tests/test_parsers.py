@@ -31,6 +31,9 @@ from prop_rules_checker.parsers.common import (
         ("-0,500", -0.5),
         (",250", 0.25),
         ("(0,750)", -0.75),
+        ("1.234.567", 1234567),
+        ("-1.250.000", -1250000),
+        ("\u20ac 12.345.678", 12345678),
         ("+3", 3),
         ("12", 12),
         (7, 7.0),
@@ -49,6 +52,11 @@ def test_parse_number_decimal_comma_and_errors():
         parse_number("abc")
     with pytest.raises(InputError):
         parse_number("1.2.3")
+    assert parse_number("1.234.567", decimal_comma=True) == 1234567
+    # Misgrouped dots are still rejected rather than guessed at.
+    for bad in ("1.23.456", "1234.567.890", "1.234.56"):
+        with pytest.raises(InputError):
+            parse_number(bad)
 
 
 def test_parse_datetime_variants():

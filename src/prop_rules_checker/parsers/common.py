@@ -60,7 +60,9 @@ def parse_number(
     ``(12.50)`` and unicode-minus negatives, ``0.10 Lots`` and ``0.1 / 0.1``.
     With ``decimal_comma`` a lone comma is a decimal separator; otherwise a lone
     comma followed by exactly three digits is read as a thousands separator,
-    unless the integer part is zero (``0,125`` is 0.125, not 125).
+    unless the integer part is zero (``0,125`` is 0.125, not 125). Several dots
+    in correctly grouped positions with no comma (``1.234.567``) are thousands
+    separators.
     """
     if text is None:
         s = ""
@@ -79,7 +81,11 @@ def parse_number(
         if empty is not None:
             return empty
         raise InputError(f"expected a number for {field}, got {text!r}")
-    if "," in s and "." in s:
+    if "," not in s and s.count(".") > 1 and re.fullmatch(r"[+-]?\d{1,3}(?:\.\d{3})+", s):
+        # "1.234.567": several dots can only be thousands grouping (decimal-comma
+        # locales such as de-DE, it-IT), never a decimal point.
+        s = s.replace(".", "")
+    elif "," in s and "." in s:
         if s.rfind(",") > s.rfind("."):
             s = s.replace(".", "").replace(",", ".")
         else:
