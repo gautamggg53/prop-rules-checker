@@ -8,6 +8,7 @@ exclusiveMinimum, pattern, items, minItems, anyOf.
 
 from __future__ import annotations
 
+import math
 import re
 from typing import Any
 
@@ -194,7 +195,12 @@ def validate(instance: Any, schema: dict[str, Any] = RULES_SCHEMA, path: str = "
         return [f"{path}: expected {expected}, got {type(instance).__name__}"]
     if "enum" in schema and instance not in schema["enum"]:
         errors.append(f"{path}: must be one of {schema['enum']}, got {instance!r}")
-    if isinstance(instance, (int, float)) and not isinstance(instance, bool):
+    if isinstance(instance, float) and not math.isfinite(instance):
+        # YAML's .nan/.inf (and NaN/Infinity in JSON) would slip past every
+        # comparison below; a NaN limit crashed the checks and an infinite one
+        # silently passed every rule.
+        errors.append(f"{path}: must be a finite number, got {instance!r}")
+    elif isinstance(instance, (int, float)) and not isinstance(instance, bool):
         if "minimum" in schema and instance < schema["minimum"]:
             errors.append(f"{path}: must be >= {schema['minimum']}")
         if "exclusiveMinimum" in schema and instance <= schema["exclusiveMinimum"]:

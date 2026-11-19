@@ -21,6 +21,11 @@ All notable changes to this project are documented here. The format follows
   part, such as `1.234.567` or `-1.250.000` (common in German and Italian
   exports), are read as 1234567 and -1250000 instead of failing with
   "expected a number". Misgrouped values like `1.23.456` are still rejected.
+- Rule files with `.nan`, `.inf` or `-.inf` (YAML) or `NaN`/`Infinity` (JSON)
+  as a number are now rejected with "must be a finite number". Before, they
+  passed validation: a NaN daily loss limit crashed with a traceback, a NaN
+  starting balance printed "nan" with every rule PASS, and an infinite limit
+  silently passed everything.
 
 ## [0.1.0] - 2026-11-03
 

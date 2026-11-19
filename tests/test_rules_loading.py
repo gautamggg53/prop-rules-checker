@@ -73,6 +73,12 @@ def test_published_schema_matches_code():
         ({"warn_at": 2}, "<= 1"),
         ({"name": ""}, "must not be empty"),
         ({"account": {}}, "initial_balance"),
+        ({"account": {"initial_balance": float("nan")}}, "finite number"),
+        ({"rules": {"daily_loss": {"limit_pct": float("nan")}}}, "finite number"),
+        ({"rules": {"max_drawdown": {"limit_amount": float("inf")}}}, "finite number"),
+        ({"rules": {"daily_loss": {"limit_pct": float("-inf")}}}, "finite number"),
+        ({"rules": {"lot_size": {"max_lots_per_trade": float("nan")}}}, "finite number"),
+        ({"warn_at": float("nan")}, "finite number"),
     ],
 )
 def test_validation_errors(patch, message):
@@ -113,3 +119,26 @@ def test_load_news(tmp_path, fixtures):
     p.write_text("when,what\nx,y\n")
     with pytest.raises(InputError, match="time"):
         load_news(p)
+
+
+@pytest.mark.parametrize("value", [".nan", ".inf", "-.inf"])
+def test_non_finite_yaml_numbers_are_rejected(tmp_path, value):
+    # YAML spells NaN/infinity as .nan/.inf; they used to pass validation, so a
+    # NaN limit crashed the daily-loss check and an infinite one passed everything.
+    p = tmp_path / "rules.yaml"
+    p.write_text(
+        "name: t\naccount: {initial_balance: 1000}\n"
+        f"rules:\n  daily_loss: {{limit_pct: 5}}\n  max_drawdown: {{limit_amount: {value}}}\n"
+    )
+    with pytest.raises(InputError, match=r"max_drawdown.limit_amount: must be a finite number"):
+        load_rules(p)
+
+
+def test_non_finite_json_numbers_are_rejected(tmp_path):
+    p = tmp_path / "rules.json"
+    p.write_text(
+        '{"name": "t", "account": {"initial_balance": NaN}, '
+        '"rules": {"daily_loss": {"limit_pct": 5}}}'
+    )
+    with pytest.raises(InputError, match=r"initial_balance: must be a finite number"):
+        load_rules(p)
